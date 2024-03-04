@@ -44,7 +44,7 @@ task make_species_report {
     File species_report_pdf = "~{samplename}.pdf"
   }
   runtime {
-    docker: "quay.io/theiagen/theiagenreporting:v0.0.1"
+    docker: "us-docker.pkg.dev/general-theiagen/docker-private/theiareporting:0.0.1"
     memory: "2 GB"
     cpu: 2
     disks: "local-disk " + disk_size + " HDD"
