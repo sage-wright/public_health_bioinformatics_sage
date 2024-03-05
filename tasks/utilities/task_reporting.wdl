@@ -9,7 +9,7 @@ task make_species_report {
     String terra_table_name
     String samplename
     String analyst_name
-    File? amrfinderplus_all_report
+    File amrfinderplus_all_report
 
     Int disk_size = 100
   }
@@ -22,7 +22,7 @@ task make_species_report {
     ### Processing of data
     table = pd.read_csv("~{terra_table}", delimiter='\t', header=0, dtype={"~{terra_table_name}_id": 'str'}) # ensure sample_id is always a string
     table["analyst_name"] = "~{analyst_name}"
-    table = table.rename(columns={"~{terra_table_name}_id": "sample"})
+    table = table.rename(columns={"entity:~{terra_table_name}_id": "sample"})
     sample_row = table[table["sample"] == "~{samplename}"]
 
     # Move elsewhere later - flu isnt in the gambit DB
@@ -32,10 +32,7 @@ task make_species_report {
     # output dataframe as json
     sample_row.to_json("~{samplename}.json", orient="records")
 
-    if os.path.exists("~{amrfinderplus_all_report}"):
-      os.system("theiareporting -a ~{amrfinderplus_all_report} -o ~{samplename}.pdf  ~{samplename}.json")
-    else:
-      os.system("theiareporting -o ~{samplename}.pdf  ~{samplename}.json")
+    os.system("theiareporting -f ~{samplename}.pdf ~{samplename}.json ~{amrfinderplus_all_report}")
 
     CODE
   >>>
@@ -44,7 +41,7 @@ task make_species_report {
     File species_report_pdf = "~{samplename}.pdf"
   }
   runtime {
-    docker: "quay.io/theiagen/theiagenreporting:v0.0.1"
+    docker: "us-docker.pkg.dev/general-theiagen/docker-private/theiareporting:0.0.5"
     memory: "2 GB"
     cpu: 2
     disks: "local-disk " + disk_size + " HDD"
