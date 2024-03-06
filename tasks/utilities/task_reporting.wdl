@@ -36,8 +36,7 @@ task make_species_report {
     CODE
   >>>
   output {
-    File species_report_json = "~{samplename}.json" # this is for internal use for testing only
-    File species_report_pdf = "~{samplename}.pdf"
+    File sample_report_pdf = "~{samplename}.pdf"
   }
   runtime {
     docker: "us-docker.pkg.dev/general-theiagen/docker-private/theiareporting:0.0.6"
