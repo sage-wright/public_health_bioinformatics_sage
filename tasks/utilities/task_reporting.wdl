@@ -9,7 +9,6 @@ task make_species_report {
     String terra_table_name
     String samplename
     String analyst_name
-    File amrfinderplus_all_report
 
     Int disk_size = 100
   }
@@ -32,7 +31,7 @@ task make_species_report {
     # output dataframe as json
     sample_row.to_json("~{samplename}.json", orient="records")
 
-    os.system("theiareporting -f ~{samplename}.pdf ~{samplename}.json ~{amrfinderplus_all_report}")
+    os.system("theiareporting -f ~{samplename}.pdf ~{samplename}.json")
 
     CODE
   >>>
@@ -41,7 +40,7 @@ task make_species_report {
     File species_report_pdf = "~{samplename}.pdf"
   }
   runtime {
-    docker: "us-docker.pkg.dev/general-theiagen/docker-private/theiareporting:0.0.5"
+    docker: "us-docker.pkg.dev/general-theiagen/docker-private/theiareporting:0.0.6"
     memory: "2 GB"
     cpu: 2
     disks: "local-disk " + disk_size + " HDD"
