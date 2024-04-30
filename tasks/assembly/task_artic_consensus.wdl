@@ -21,19 +21,28 @@ task consensus {
       # setup custom primer scheme (/V is required by Artic)
       mkdir -p ./primer-schemes/HIV/Vuser
 
-      ## set reference genome
+      # set reference genome
       ref_genome="~{reference_genome}"
-
       head -n1 "${ref_genome}" | sed 's/>//' | tee REFERENCE_GENOME
       cp "${ref_genome}" ./primer-schemes/HIV/Vuser/HIV.reference.fasta
 
-      ## set primers
-      #cp ~{primer_bed} ./primer-schemes/SARS-CoV-2/Vuser/SARS-CoV-2.scheme.bed
-      #p_bed="~{primer_bed}"
+      # set primers
       cp "~{primer_bed}" ./primer-schemes/HIV/Vuser/HIV.scheme.bed
       scheme_name="HIV/Vuser"
-    # Add other viruses here
-    # Default is SARS-CoV-2
+
+    elif [[ ~{organism} == "WNV" ]]; then
+      # setup custom primer scheme (/V is required by Artic)
+      mkdir -p ./primer-schemes/WNV/Vuser
+
+      # set reference genome
+      ref_genome="~{reference_genome}"
+      head -n1 "${ref_genome}" | sed 's/>//' | tee REFERENCE_GENOME
+      cp "${ref_genome}" ./primer-schemes/WNV/Vuser/WNV.reference.fasta
+
+      # set primers
+      cp "~{primer_bed}" ./primer-schemes/WNV/Vuser/WNV.scheme.bed
+      scheme_name="WNV/Vuser"
+    
     else
       # setup custom primer scheme (/V is required by Artic)
       mkdir -p ./primer-schemes/SARS-CoV-2/Vuser
