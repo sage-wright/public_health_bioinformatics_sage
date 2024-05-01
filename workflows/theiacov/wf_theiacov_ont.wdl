@@ -76,9 +76,6 @@ workflow theiacov_ont {
       primer_bed_file = primer_bed,
       pangolin_docker_image = pangolin_docker_image
   }
-  if (organism_parameters.standardized_organism == "HIV") { # set HIV specific artic version
-    String run_prefix = "artic_hiv"
-  }
   call screen.check_reads_se as raw_check_reads {
     input:
       read1 = read1,
@@ -91,17 +88,17 @@ workflow theiacov_ont {
       skip_mash = skip_mash,
       workflow_series = "theiacov",
       organism = organism_parameters.standardized_organism,
-      expected_genome_length = genome_length
+      expected_genome_length = organism_parameters.genome_length
   }
   if (raw_check_reads.read_screen == "PASS") {
     call read_qc_trim_workflow.read_QC_trim_ont as read_qc_trim {
       input:
         read1 = read1,
         samplename = samplename,
-        genome_length = genome_length,
+        genome_length = organism_parameters.genome_length,
         min_length = min_length,
         max_length = max_length,
-        run_prefix = run_prefix,
+        run_prefix = organism_parameters.artic_run_prefix,
         target_organism = organism_parameters.kraken_target_organism,
         workflow_series = "theiacov"
     }
@@ -117,7 +114,7 @@ workflow theiacov_ont {
         skip_mash = skip_mash,
         workflow_series = "theiacov",
         organism = organism_parameters.standardized_organism,
-        expected_genome_length = genome_length
+        expected_genome_length = organism_parameters.genome_length
     }
     if (clean_check_reads.read_screen == "PASS") {
       # assembly via artic_consensus for sars-cov-2 and HIV
@@ -163,7 +160,7 @@ workflow theiacov_ont {
               flu_subtype = irma.irma_subtype,
               # including these to block from terra
               reference_genome = reference_genome,
-              genome_length_input = genome_length,
+              genome_length_input = organism_parameters.genome_length,
               nextclade_dataset_tag_input = nextclade_dataset_tag,
               nextclade_dataset_name_input = nextclade_dataset_name,
               vadr_max_length = vadr_max_length,
@@ -182,7 +179,7 @@ workflow theiacov_ont {
               flu_subtype = irma.irma_subtype,
                # including these to block from terra
               reference_genome = reference_genome,
-              genome_length_input = genome_length,
+              genome_length_input = organism_parameters.genome_length,
               nextclade_dataset_tag_input = nextclade_dataset_tag,
               nextclade_dataset_name_input = nextclade_dataset_name,     
               vadr_max_length = vadr_max_length,
@@ -214,13 +211,13 @@ workflow theiacov_ont {
         input:
           read1 = read1,
           samplename = samplename,
-          est_genome_length = select_first([genome_length, consensus_qc.number_Total, organism_parameters.genome_length])
+          est_genome_length = organism_parameters.genome_length
       }
       call nanoplot_task.nanoplot as nanoplot_clean {
         input:
           read1 = read_qc_trim.read1_clean,
           samplename = samplename,
-          est_genome_length = select_first([genome_length, consensus_qc.number_Total, organism_parameters.genome_length])
+          est_genome_length = organism_parameters.genome_length
       }
       if (organism_parameters.standardized_organism == "flu") {
         call flu_antiviral.flu_antiviral_substitutions {

@@ -36,6 +36,9 @@ workflow organism_parameters {
 
     # kraken parameters
     String? kraken_target_organism_input
+
+    # artic read filtering parameters
+    String? run_prefix
   }
   if (organism == "sars-cov-2" || organism == "SARS-CoV-2") {
     String sc2_org_name = "sars-cov-2"
@@ -49,6 +52,7 @@ workflow organism_parameters {
     Int sc2_vadr_skip_length = 10000
     String sc2_vadr_options = "--noseqnamemax --glsearch -s -r --nomisc --mkey sarscov2 --lowsim5seq 6 --lowsim3seq 6 --alt_fail lowscore,insertnn,deletinn --out_allfasta"
     Int sc2_vadr_memory = 8
+    String sc2_run_prefix = "artic_ncov2019"
   }
   if (organism == "MPXV" || organism == "mpox" || organism == "monkeypox" || organism == "Monkeypox virus" || organism == "Mpox") {
     String mpox_org_name = "MPXV"
@@ -77,6 +81,7 @@ workflow organism_parameters {
     Int wnv_vadr_memory = 8
     String wnv_nextclade_ds_tag = "NA"
     String wnv_nextclade_ds_name = "NA"
+    String wnv_run_prefix = "artic_wnv"
   }
   if (organism == "flu" || organism == "influenza" || organism == "Flu" || organism == "Influenza") {
     String flu_org_name = "flu"
@@ -156,25 +161,26 @@ workflow organism_parameters {
     Int rsv_b_vadr_skip_length = 5000
     Int rsv_b_vadr_memory = 32
   }
-  if (organism == "HIV" && hiv_primer_version == "v1") {
-    String hiv_v1_org_name = "HIV"
-    String hiv_v1_reference_genome = "gs://theiagen-public-files/terra/hivgc-files/NC_001802.1.fasta"
-    String hiv_v1_reference_gff = "gs://theiagen-public-files/terra/hivgc-files/NC_001802.1.gff3"
-    String hiv_v1_primer_bed = "gs://theiagen-public-files/terra/hivgc-files/HIV-1_v1.0.primer.hyphen.bed"
-    String hiv_v1_target_organism = "Human immunodeficiency virus 1"
-    Int hiv_v1_genome_len = 9181 
-  }
-  if (organism == "HIV" && hiv_primer_version == "v2") {
-    String hiv_v2_org_name = "HIV"
-    String hiv_v2_reference_genome = "gs://theiagen-public-files/terra/hivgc-files/AY228557.1.headerchanged.fasta"
-    String hiv_v2_reference_gff = "gs://theiagen-public-files/terra/hivgc-files/AY228557.1.gff3"
-    String hiv_v2_primer_bed = "gs://theiagen-public-files/terra/hivgc-files/HIV-1_v2.0.primer.hyphen400.1.bed"
-    String hiv_v2_target_organism = "Human immunodeficiency virus 1"
-    Int hiv_v2_genome_len = 9840
+  if (organism == "HIV") {
+    String hiv_org_name = "HIV"
+    String hiv_target_organism = "Human immunodeficiency virus 1"
+    String hiv_run_prefix = "artic_hiv"
+    if (hiv_primer_version == "v1") {
+      String hiv_v1_reference_genome = "gs://theiagen-public-files/terra/hivgc-files/NC_001802.1.fasta"
+      String hiv_v1_reference_gff = "gs://theiagen-public-files/terra/hivgc-files/NC_001802.1.gff3"
+      String hiv_v1_primer_bed = "gs://theiagen-public-files/terra/hivgc-files/HIV-1_v1.0.primer.hyphen.bed"
+      Int hiv_v1_genome_len = 9181 
+    }
+    if (hiv_primer_version == "v2") {
+      String hiv_v2_reference_genome = "gs://theiagen-public-files/terra/hivgc-files/AY228557.1.headerchanged.fasta"
+      String hiv_v2_reference_gff = "gs://theiagen-public-files/terra/hivgc-files/AY228557.1.gff3"
+      String hiv_v2_primer_bed = "gs://theiagen-public-files/terra/hivgc-files/HIV-1_v2.0.primer.hyphen400.1.bed"
+      Int hiv_v2_genome_len = 9840
+    }
   }
   output {
     # standardized organism flag
-    String standardized_organism = select_first([sc2_org_name, mpox_org_name, wnv_org_name, flu_org_name, rsv_a_org_name, rsv_b_org_name, hiv_v1_org_name, hiv_v2_org_name])
+    String standardized_organism = select_first([sc2_org_name, mpox_org_name, wnv_org_name, flu_org_name, rsv_a_org_name, rsv_b_org_name, hiv_org_name])
     # reference genome and sequencing information
     File reference = select_first([reference_genome, sc2_reference_genome, mpox_reference_genome, wnv_reference_genome, h1n1_ha_reference, h3n2_ha_reference, vic_ha_reference, yam_ha_reference, h1n1_na_reference, h3n2_na_reference, vic_na_reference, yam_na_reference, 
     rsv_a_reference_genome, rsv_b_reference_genome, hiv_v1_reference_genome, hiv_v2_reference_genome, "gs://theiagen-public-files/terra/theiacov-files/empty.fasta"])
@@ -193,6 +199,7 @@ workflow organism_parameters {
     Int vadr_memory = select_first([vadr_mem, sc2_vadr_memory, mpox_vadr_memory, wnv_vadr_memory, flu_vadr_memory, rsv_a_vadr_memory, rsv_b_vadr_memory, 0])
     Int vadr_skiplength = select_first([vadr_skip_length, sc2_vadr_skip_length, mpox_vadr_skip_length, wnv_vadr_skip_length, flu_vadr_skip_length, rsv_a_vadr_skip_length, rsv_b_vadr_skip_length, 0])
     # kraken options
-    String kraken_target_organism = select_first([kraken_target_organism_input, mpox_kraken_target_organism, wnv_kraken_target_organism, hiv_v1_target_organism, hiv_v2_target_organism, ""])
+    String kraken_target_organism = select_first([kraken_target_organism_input, mpox_kraken_target_organism, wnv_kraken_target_organism, hiv_target_organism, ""])
+    String artic_run_prefix = select_first([run_prefix, sc2_run_prefix, wnv_run_prefix, hiv_run_prefix, ""])
   }
 }
