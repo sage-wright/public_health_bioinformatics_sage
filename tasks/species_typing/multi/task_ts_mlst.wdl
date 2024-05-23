@@ -9,8 +9,8 @@ task ts_mlst {
     String samplename
     String docker = "us-docker.pkg.dev/general-theiagen/staphb/mlst:2.23.0-2024-03-11"
     Int disk_size = 100
-    Int cpu = 4
-    Int memory = 8
+    Int cpu = 1
+    Int memory = 2
     # Parameters
     # --nopath          Strip filename paths from FILE column (default OFF)
     # --scheme [X]      Don't autodetect, force this scheme on all inputs (default '')
