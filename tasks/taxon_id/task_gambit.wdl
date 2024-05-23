@@ -8,8 +8,8 @@ task gambit {
     File gambit_db_genomes = "gs://gambit-databases-rp/1.3.0/gambit-metadata-1.3-231016.gdb"
     File gambit_db_signatures = "gs://gambit-databases-rp/1.3.0/gambit-signatures-1.3-231016.gs"
     Int disk_size = 100
-    Int memory = 16 # set default
-    Int cpu = 8 # set default
+    Int memory = 4 # set default
+    Int cpu = 1 # set default
   }
   # If "File" type is used Cromwell attempts to localize it, which fails because it doesn't exist yet.
   String report_path = "~{samplename}_gambit.json"
