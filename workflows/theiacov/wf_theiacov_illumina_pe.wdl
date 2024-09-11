@@ -171,7 +171,8 @@ workflow theiacov_illumina_pe {
               input:
                 genome_fasta = select_first([ivar_consensus.assembly_fasta])
             }
-          } else {
+          }
+          if (nextclade_predict_dataset_name == false) {
             call nextclade_task.nextclade_v3 {
               input:
                 genome_fasta = select_first([ivar_consensus.assembly_fasta]),
@@ -181,7 +182,7 @@ workflow theiacov_illumina_pe {
           }
           call nextclade_task.nextclade_output_parser {
             input:
-              nextclade_tsv = nextclade_v3.nextclade_tsv,
+              nextclade_tsv = select_first([nextclade_auto_predict.nextclade_tsv, nextclade_v3.nextclade_tsv]),
               organism = organism_parameters.standardized_organism
           }
         }
