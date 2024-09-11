@@ -46,6 +46,7 @@ workflow theiacov_illumina_pe {
     # nextclade inputs
     String? nextclade_dataset_tag
     String? nextclade_dataset_name
+    Boolean nextclade_predict_dataset_name = false
     # vadr parameters
     Int? vadr_max_length
     Int? vadr_skip_length
@@ -165,11 +166,18 @@ workflow theiacov_illumina_pe {
         # run organism-specific typing
         if (organism_parameters.standardized_organism == "MPXV" || organism_parameters.standardized_organism == "sars-cov-2" || organism_parameters.standardized_organism == "rsv_a" || organism_parameters.standardized_organism == "rsv_b") { 
           # tasks specific to either MPXV, sars-cov-2, or RSV-A/RSV-B
-          call nextclade_task.nextclade_v3 {
-            input:
-              genome_fasta = select_first([ivar_consensus.assembly_fasta]),
-              dataset_name = organism_parameters.nextclade_dataset_name,
-              dataset_tag = organism_parameters.nextclade_dataset_tag
+          if (nextclade_predict_dataset_name) {
+            call nextclade_task.nextclade_auto_predict {
+              input:
+                genome_fasta = select_first([ivar_consensus.assembly_fasta])
+            }
+          } else {
+            call nextclade_task.nextclade_v3 {
+              input:
+                genome_fasta = select_first([ivar_consensus.assembly_fasta]),
+                dataset_name = organism_parameters.nextclade_dataset_name,
+                dataset_tag = organism_parameters.nextclade_dataset_tag
+            }
           }
           call nextclade_task.nextclade_output_parser {
             input:
@@ -351,13 +359,13 @@ workflow theiacov_illumina_pe {
     String? pangolin_docker = pangolin4.pangolin_docker
     String? pangolin_versions = pangolin4.pangolin_versions
     # Nextclade outputs for all organisms
-    String nextclade_version = select_first([nextclade_v3.nextclade_version, flu_track.nextclade_version, ""])
-    String nextclade_docker = select_first([nextclade_v3.nextclade_docker, flu_track.nextclade_docker, ""])
+    String nextclade_version = select_first([nextclade_auto_predict.nextclade_version, nextclade_v3.nextclade_version, flu_track.nextclade_version, ""])
+    String nextclade_docker = select_first([nextclade_auto_predict.nextclade_docker, nextclade_v3.nextclade_docker, flu_track.nextclade_docker, ""])
     # Nextclade outputs for non-flu
-    File? nextclade_json = nextclade_v3.nextclade_json
-    File? auspice_json = nextclade_v3.auspice_json
-    File? nextclade_tsv = nextclade_v3.nextclade_tsv
-    String nextclade_ds_tag = organism_parameters.nextclade_dataset_tag
+    File? nextclade_json = select_first([nextclade_auto_predict.nextclade_json, nextclade_v3.nextclade_json])
+    File? auspice_json = select_first([nextclade_auto_predict.auspice_json, nextclade_v3.auspice_json])
+    File? nextclade_tsv = select_first([nextclade_auto_predict.nextclade_tsv, nextclade_v3.nextclade_tsv])
+    String nextclade_ds_tag = select_first([nextclade_auto_predict.nextclade_dataset_tag, organism_parameters.nextclade_dataset_tag, ""])
     String? nextclade_aa_subs = nextclade_output_parser.nextclade_aa_subs
     String? nextclade_aa_dels = nextclade_output_parser.nextclade_aa_dels
     String? nextclade_clade = nextclade_output_parser.nextclade_clade

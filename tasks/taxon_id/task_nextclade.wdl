@@ -126,6 +126,73 @@ task nextclade_v3 {
   }
 }
 
+task nextclade_auto_predict {
+  meta {
+    description: "Nextclade classification of one sample. Automatically predicts the dataset name and tag."
+  }
+  input {
+    File genome_fasta
+    File? auspice_reference_tree_json
+    File? gene_annotations_gff
+    File? nextclade_pathogen_json
+    File? input_ref
+    String docker = "us-docker.pkg.dev/general-theiagen/nextstrain/nextclade:3.3.1"
+    String verbosity = "warn" # other options are: "off" "error" "info" "debug" and "trace"
+    Int disk_size = 50
+    Int memory = 4
+    Int cpu = 2
+  }
+  String basename = basename(genome_fasta, ".fasta")
+  command <<<
+    # track version & print to log
+    nextclade --version | tee NEXTCLADE_VERSION
+
+    # predict dataset name
+    dataset_name=$(nextclade sort -r nextclade_dataset_output.tsv "~{genome_fasta}" && awk 'NR==2 {print $3}' nextclade_dataset_output.tsv)
+
+    echo $dataset_name > NEXTCLADE_DATASET_NAME
+
+    # exit script/task upon error
+    set -e
+
+    # by default, use the latest tag
+    nextclade run \
+      --dataset-name $dataset_name \
+      ~{"--input-ref " + input_ref} \
+      ~{"--input-tree " + auspice_reference_tree_json} \
+      ~{"--input-pathogen-json " + nextclade_pathogen_json} \
+      ~{"--input-annotation " + gene_annotations_gff} \
+      --output-json "~{basename}".nextclade.json \
+      --output-tsv  "~{basename}".nextclade.tsv \
+      --output-tree "~{basename}".nextclade.auspice.json \
+      --output-all . \
+      --verbosity ~{verbosity} \
+      "~{genome_fasta}"
+
+    #to extract the dataset tag
+    nextclade dataset list --name $dataset_name --json > dataset_tag.json
+    grep -A 2 '"version": {' dataset_tag.json | grep '"tag"' | head -n 1 | sed 's/.*"tag": *"\([^"]*\)".*/\1/' > NEXTCLADE_DATASET_TAG
+  >>>
+  runtime {
+    docker: "~{docker}"
+    memory: "~{memory} GB"
+    cpu: cpu
+    disks:  "local-disk " + disk_size + " SSD"
+    disk: disk_size + " GB" # TES
+    dx_instance_type: "mem1_ssd1_v2_x2"
+    maxRetries: 3
+  }
+  output {
+    String nextclade_version = read_string("NEXTCLADE_VERSION")
+    File nextclade_json = "~{basename}.nextclade.json"
+    File auspice_json = "~{basename}.nextclade.auspice.json"
+    File nextclade_tsv = "~{basename}.nextclade.tsv"
+    String nextclade_docker = docker
+    String nextclade_dataset_name = read_string("NEXTCLADE_DATASET_NAME")
+    String nextclade_dataset_tag = read_string("NEXTCLADE_DATASET_TAG")
+  }
+}
+
 task nextclade_output_parser {
   meta {
     description: "Python and bash codeblocks for parsing the output files from Nextclade."
