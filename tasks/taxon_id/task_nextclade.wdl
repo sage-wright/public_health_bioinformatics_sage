@@ -148,30 +148,40 @@ task nextclade_auto_predict {
     nextclade --version | tee NEXTCLADE_VERSION
 
     # predict dataset name
-    dataset_name=$(nextclade sort -r nextclade_dataset_output.tsv "~{genome_fasta}" && awk 'NR==2 {print $3}' nextclade_dataset_output.tsv)
+    nextclade sort -r nextclade_dataset_output.tsv "~{genome_fasta}"
+    dataset_name=$(cat nextclade_dataset_output.tsv | awk 'NR==2 {print $3}')
 
-    echo $dataset_name > NEXTCLADE_DATASET_NAME
+    echo "${dataset_name}" > NEXTCLADE_DATASET_NAME
 
     # exit script/task upon error
     set -e
+    touch test.txt
 
-    # by default, use the latest tag
-    nextclade run \
-      --dataset-name $dataset_name \
-      ~{"--input-ref " + input_ref} \
-      ~{"--input-tree " + auspice_reference_tree_json} \
-      ~{"--input-pathogen-json " + nextclade_pathogen_json} \
-      ~{"--input-annotation " + gene_annotations_gff} \
-      --output-json "~{basename}".nextclade.json \
-      --output-tsv  "~{basename}".nextclade.tsv \
-      --output-tree "~{basename}".nextclade.auspice.json \
-      --output-all . \
-      --verbosity ~{verbosity} \
-      "~{genome_fasta}"
+    # if the dataset name is found, run nextclade
+    if ! [[ "${dataset_name}" == "" ]]; then
+      nextclade run \
+        --dataset-name "${dataset_name}" \
+        ~{"--input-ref " + input_ref} \
+        ~{"--input-tree " + auspice_reference_tree_json} \
+        ~{"--input-pathogen-json " + nextclade_pathogen_json} \
+        ~{"--input-annotation " + gene_annotations_gff} \
+        --output-json "~{basename}".nextclade.json \
+        --output-tsv  "~{basename}".nextclade.tsv \
+        --output-tree "~{basename}".nextclade.auspice.json \
+        --output-all . \
+        --verbosity ~{verbosity} \
+        "~{genome_fasta}"
 
-    #to extract the dataset tag
-    nextclade dataset list --name $dataset_name --json > dataset_tag.json
-    grep -A 2 '"version": {' dataset_tag.json | grep '"tag"' | head -n 1 | sed 's/.*"tag": *"\([^"]*\)".*/\1/' > NEXTCLADE_DATASET_TAG
+      # by default, use the latest tag
+      nextclade dataset list --name "${dataset_name}" --json > dataset_tag.json
+      grep -A 2 '"version": {' dataset_tag.json | grep '"tag"' | head -n 1 | sed 's/.*"tag": *"\([^"]*\)".*/\1/' > NEXTCLADE_DATASET_TAG
+    else
+      echo "Dataset name could not be predicted" > NEXTCLADE_DATASET_NAME
+      echo "Dataset name could not be predicted" > NEXTCLADE_DATASET_TAG
+      echo "Dataset name could not be predicted" > "~{basename}.nextclade.json"
+      echo "Dataset name could not be predicted" > "~{basename}.nextclade.auspice.json"
+      echo "Dataset name could not be predicted" > "~{basename}.nextclade.tsv"
+    fi
   >>>
   runtime {
     docker: "~{docker}"
@@ -215,61 +225,86 @@ task nextclade_output_parser {
     import csv
     import codecs
 
-    with codecs.open("./input.tsv",'r') as tsv_file:
-      tsv_reader = csv.reader(tsv_file, delimiter="\t")
-      tsv_data = list(tsv_reader)
+    # Function to write 'None' into all required files
+    def write_none_to_files():
+        with codecs.open("NEXTCLADE_CLADE", 'w') as file:
+            file.write("None")
+        with codecs.open("NEXTCLADE_DATASET_TAG", 'w') as file:
+            file.write("None")
+        with codecs.open("NEXTCLADE_AASUBS", 'w') as file:
+            file.write("None")
+        with codecs.open("NEXTCLADE_AADELS", 'w') as file:
+            file.write("None")
+        with codecs.open("NEXTCLADE_LINEAGE", 'w') as file:
+            file.write("None")
+        with codecs.open("NEXTCLADE_QC", 'w') as file:
+            file.write("None")
 
-      if len(tsv_data) == 1:
-        tsv_data.append(['NA']*len(tsv_data[0]))
-      tsv_dict = dict(zip(tsv_data[0], tsv_data[1]))
+    # Check if the file contains "Dataset name could not be predicted"
+    with codecs.open("./input.tsv", 'r') as tsv_file:
+        file_content = tsv_file.read()
 
-      # combine 'clade_nextstrain' and 'clade_who' column if sars-cov-2, if false then parse 'clade' column
-      if ("~{organism}" == "sars-cov-2"):
-        with codecs.open("NEXTCLADE_CLADE", 'wt') as Nextclade_Clade:
-          nc_clade = tsv_dict['clade_nextstrain']
-          who_clade = tsv_dict['clade_who']
-          if (nc_clade != who_clade) and (nc_clade != '') and (who_clade != ''):
-            nc_clade = nc_clade + " (" + who_clade + ")"
-          if nc_clade == '':
-            nc_clade = 'NA'
-          Nextclade_Clade.write(nc_clade)
-      else:
-        with codecs.open("NEXTCLADE_CLADE", 'wt') as Nextclade_Clade:
-          nc_clade = tsv_dict['clade']
-          if nc_clade == '':
-            nc_clade = 'NA'
-          Nextclade_Clade.write(nc_clade)
+    if "Dataset name could not be predicted" in file_content or not file_content.strip():
+        # If file is empty or contains the specific phrase, skip processing and write 'None' to files
+        print("Empty input file or dataset name could not be predicted. Skipping processing.")
+        write_none_to_files()
+    else:
+        # Proceed with processing the tsv file
+        with codecs.open("./input.tsv", 'r') as tsv_file:
+            tsv_reader = csv.reader(tsv_file, delimiter="\t")
+            tsv_data = list(tsv_reader)
 
-      with codecs.open("NEXTCLADE_AASUBS", 'wt') as Nextclade_AA_Subs:
-        nc_aa_subs = tsv_dict['aaSubstitutions']
-        if nc_aa_subs == '':
-          nc_aa_subs = 'NA'
-        Nextclade_AA_Subs.write(nc_aa_subs)
+            if len(tsv_data) == 1:
+                tsv_data.append(['NA'] * len(tsv_data[0]))
+            tsv_dict = dict(zip(tsv_data[0], tsv_data[1]))
 
-      with codecs.open("NEXTCLADE_AADELS", 'wt') as Nextclade_AA_Dels:
-        nc_aa_dels = tsv_dict['aaDeletions']
-        if nc_aa_dels == '':
-          nc_aa_dels = 'NA'
-        Nextclade_AA_Dels.write(nc_aa_dels)
+            # Combine 'clade_nextstrain' and 'clade_who' column if sars-cov-2
+            if ("~{organism}" == "sars-cov-2"):
+                with codecs.open("NEXTCLADE_CLADE", 'wt') as Nextclade_Clade:
+                    nc_clade = tsv_dict['clade_nextstrain']
+                    who_clade = tsv_dict['clade_who']
+                    if (nc_clade != who_clade) and (nc_clade != '') and (who_clade != ''):
+                        nc_clade = nc_clade + " (" + who_clade + ")"
+                    if nc_clade == '':
+                        nc_clade = 'NA'
+                    Nextclade_Clade.write(nc_clade)
+            else:
+                with codecs.open("NEXTCLADE_CLADE", 'wt') as Nextclade_Clade:
+                    nc_clade = tsv_dict['clade']
+                    if nc_clade == '':
+                        nc_clade = 'NA'
+                    Nextclade_Clade.write(nc_clade)
 
-      with codecs.open("NEXTCLADE_LINEAGE", 'wt') as Nextclade_Lineage:
-        if 'lineage' in tsv_dict:
-          nc_lineage = tsv_dict['lineage']
-          if nc_lineage is None:
-            nc_lineage = ""
-        elif 'Nextclade_pango' in tsv_dict:
-          nc_lineage = tsv_dict['Nextclade_pango']
-          if nc_lineage is None:
-            nc_lineage = ""
-        else:
-          nc_lineage = ""
-        Nextclade_Lineage.write(nc_lineage)
-      
-      with codecs.open("NEXTCLADE_QC", 'wt') as Nextclade_QC:
-        nc_qc = tsv_dict['qc.overallStatus']
-        if nc_qc == '':
-          nc_qc = 'NA'
-        Nextclade_QC.write(nc_qc)
+            with codecs.open("NEXTCLADE_AASUBS", 'wt') as Nextclade_AA_Subs:
+                nc_aa_subs = tsv_dict['aaSubstitutions']
+                if nc_aa_subs == '':
+                    nc_aa_subs = 'NA'
+                Nextclade_AA_Subs.write(nc_aa_subs)
+
+            with codecs.open("NEXTCLADE_AADELS", 'wt') as Nextclade_AA_Dels:
+                nc_aa_dels = tsv_dict['aaDeletions']
+                if nc_aa_dels == '':
+                    nc_aa_dels = 'NA'
+                Nextclade_AA_Dels.write(nc_aa_dels)
+
+            with codecs.open("NEXTCLADE_LINEAGE", 'wt') as Nextclade_Lineage:
+                if 'lineage' in tsv_dict:
+                    nc_lineage = tsv_dict['lineage']
+                    if nc_lineage is None:
+                        nc_lineage = ""
+                elif 'Nextclade_pango' in tsv_dict:
+                    nc_lineage = tsv_dict['Nextclade_pango']
+                    if nc_lineage is None:
+                        nc_lineage = ""
+                else:
+                    nc_lineage = ""
+                Nextclade_Lineage.write(nc_lineage)
+
+            with codecs.open("NEXTCLADE_QC", 'wt') as Nextclade_QC:
+                nc_qc = tsv_dict['qc.overallStatus']
+                if nc_qc == '':
+                    nc_qc = 'NA'
+                Nextclade_QC.write(nc_qc)
     CODE
   >>>
   runtime {

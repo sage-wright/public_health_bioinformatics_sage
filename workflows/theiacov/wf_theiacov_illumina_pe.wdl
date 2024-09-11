@@ -367,6 +367,7 @@ workflow theiacov_illumina_pe {
     File? auspice_json = select_first([nextclade_auto_predict.auspice_json, nextclade_v3.auspice_json])
     File? nextclade_tsv = select_first([nextclade_auto_predict.nextclade_tsv, nextclade_v3.nextclade_tsv])
     String nextclade_ds_tag = select_first([nextclade_auto_predict.nextclade_dataset_tag, organism_parameters.nextclade_dataset_tag, ""])
+    String nextclade_ds_name = select_first([nextclade_auto_predict.nextclade_dataset_name, organism_parameters.nextclade_dataset_name, ""])
     String? nextclade_aa_subs = nextclade_output_parser.nextclade_aa_subs
     String? nextclade_aa_dels = nextclade_output_parser.nextclade_aa_dels
     String? nextclade_clade = nextclade_output_parser.nextclade_clade
