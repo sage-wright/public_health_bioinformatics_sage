@@ -7,7 +7,8 @@ task busco {
   input {
     File assembly
     String samplename
-    String docker = "us-docker.pkg.dev/general-theiagen/ezlabgva/busco:v5.7.1_cv1"
+    String docker = "us-docker.pkg.dev/general-theiagen/ezlabgva/busco:v5.8.2_cv1"
+    File busco_database_zip
     Int memory = 8
     Int cpu = 2
     Int disk_size = 100
@@ -16,6 +17,9 @@ task busco {
   command <<<
     # get version
     busco --version | tee "VERSION"
+
+    mkdir -p busco_downloads
+    unzip ~{busco_database_zip} -d busco_downloads/
  
     # run busco
     # -i input assembly
@@ -28,6 +32,8 @@ task busco {
       -c ~{cpu} \
       -m geno \
       -o ~{samplename} \
+      --offline \
+      --download_path busco_downloads \
       ~{true='--auto-lineage-euk' false='--auto-lineage-prok' eukaryote}
 
     # check for existence of output file; otherwise display a string that says the output was not created
