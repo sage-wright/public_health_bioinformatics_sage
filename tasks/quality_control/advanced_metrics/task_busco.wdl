@@ -8,7 +8,7 @@ task busco {
     File assembly
     String samplename
     String docker = "us-docker.pkg.dev/general-theiagen/ezlabgva/busco:v5.8.0_cv1"
-    File busco_database_zip = "gs://theiagen-large-public-files-rp/terra/databases/busco/odb10/busco_prokaryota_odb10.tar.gz"
+    File busco_database_tar = "gs://theiagen-large-public-files-rp/terra/databases/busco/odb10/busco_prokaryota_odb10.tar.gz"
     Int memory = 8
     Int cpu = 2
     Int disk_size = 100
@@ -21,7 +21,7 @@ task busco {
     busco --version | tee "VERSION"
 
     mkdir -p busco_downloads
-    tar -xvf ~{busco_database_zip} -d busco_downloads/
+    tar xvf ~{busco_database_tar} -d busco_downloads/
  
     # run busco
     # -i input assembly
