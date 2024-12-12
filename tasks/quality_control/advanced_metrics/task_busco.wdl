@@ -21,7 +21,7 @@ task busco {
     busco --version | tee "VERSION"
 
     mkdir -p busco_downloads
-    tar -xzf ~{busco_database_zip} -d busco_downloads/
+    tar -xvf ~{busco_database_zip} -d busco_downloads/
  
     # run busco
     # -i input assembly
