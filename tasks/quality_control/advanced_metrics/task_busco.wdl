@@ -15,11 +15,13 @@ task busco {
     Boolean eukaryote = false
   }
   command <<<
+    #set euo pipefail to avoid 
+    set -euo pipefail
     # get version
     busco --version | tee "VERSION"
 
     mkdir -p busco_downloads
-    unzip ~{busco_database_zip} -d busco_downloads/
+    tar -xzf ~{busco_database_zip} -d busco_downloads/
  
     # run busco
     # -i input assembly
