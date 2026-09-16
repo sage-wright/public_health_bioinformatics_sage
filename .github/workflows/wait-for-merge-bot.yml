@@ -1,4 +1,4 @@
-name: please use merge bot
+name: merge this pr with the -merge label
 
 on:
   pull_request:
