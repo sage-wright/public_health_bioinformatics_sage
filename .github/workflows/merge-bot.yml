@@ -93,6 +93,22 @@ jobs:
             git push
           fi
 
+      - name: Debug merge block
+        run: |
+            echo "--- token identity ---"
+            gh api user --jq .login
+            echo "--- pr state ---"
+            gh pr view "$PR" --json reviewDecision,mergeStateStatus,mergeable,isDraft
+            echo "--- allowed merge methods ---"
+            gh api "repos/${{ github.repository }}" \
+                --jq '{squash: .allow_squash_merge, merge: .allow_merge_commit, rebase: .allow_rebase_merge}'
+            echo "--- rulesets in effect for this branch ---"
+            gh api "repos/${{ github.repository }}/rules/branches/main" \
+                --jq '[.[] | {type, ruleset: .ruleset_id, source: .ruleset_source}]'
+            echo "--- classic protection ---"
+            gh api "repos/${{ github.repository }}/branches/main/protection" || echo "none (good)"
+
+
       - name: Squash merge
         # perform a squash and merge
         id: squash
