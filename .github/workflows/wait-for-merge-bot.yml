@@ -1,4 +1,4 @@
-name: awaiting merge bot
+name: merge this pr with the -merge label
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    name: awaiting merge bot
+    name: label not found
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
