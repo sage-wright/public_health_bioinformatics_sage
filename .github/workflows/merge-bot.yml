@@ -124,7 +124,6 @@ jobs:
 
       - name: Restore branch tag
         id: restore
-
         # put the branch tag back
         run: |
           git fetch origin "$BRANCH"
@@ -201,22 +200,22 @@ jobs:
             checkout)
               TITLE=":x: **Merge bot failed: could not check out the branch.**"
               WHY="Checkout of \`$BRANCH\` failed."
-              FIX="Usually means the branch was deleted or force-pushed while the bot was running. Re-apply the label to retry."
+              FIX="Usually means the branch was deleted or force-pushed while the bot was running."
               ;;
             approval)
               TITLE=":x: **Merge bot stopped: no approving review.**"
               WHY="This PR has no review in the APPROVED state."
-              FIX="Get an approval, then remove and re-apply the \`ready-to-merge\` label. Note that a prior approval is dismissed whenever new commits are pushed."
+              FIX="Get an approval before re-applying the label. Note that a prior approval is dismissed whenever new commits are pushed."
               ;;
             checks)
               TITLE=":x: **Merge bot stopped: required checks are not passing.**"
               WHY="One or more required status checks failed, or are still pending."
-              FIX="See the checks tab on this PR. Fix the failures, then remove and re-apply the label. If the run log says \`no required checks reported\`, no required checks are configured on this branch — that is a ruleset configuration issue, not a problem with this PR."
+              FIX="See the checks tab on this PR and fix the failures. If the run log says \`no required checks reported\`, no required checks are configured on this branch — that is a ruleset configuration issue, not a problem with this PR."
               ;;
             mergeable)
               TITLE=":x: **Merge bot stopped: PR is not in a mergeable state.**"
               WHY="GitHub reports this PR as not mergeable — most often a conflict with \`main\`, or the branch is behind and the ruleset requires it to be up to date."
-              FIX="Merge \`main\` into \`$BRANCH\`, resolve any conflicts, then remove and re-apply the label. The run log shows the exact \`mergeStateStatus\`."
+              FIX="Merge \`main\` into \`$BRANCH\` and resolve any conflicts. The run log shows the exact \`mergeStateStatus\`."
               ;;
             clear)
               TITLE=":x: **Merge bot failed: could not clear the version tag.**"
@@ -225,8 +224,8 @@ jobs:
               ;;
             squash)
               TITLE=":x: **Merge bot failed: the squash merge was refused.**"
-              WHY="GitHub rejected the merge. The most common causes are that the app is missing from the bypass list on \`main\`'s ruleset, that squash merging is disabled for this repository, or that classic branch protection is still active alongside the ruleset."
-              FIX="Check Settings → Rules → Rulesets → main → Bypass list contains the app (under the **Apps** tab, set to **Always**), and Settings → General → Pull Requests has squash merging enabled. Also confirm no org-level ruleset targets this repo without the bypass."
+              WHY="GitHub rejected the merge. The most common causes are that the app is missing from the bypass list on the ruleset containing the \`pull_request\` rule, that squash merging is disabled for this repository, or that more than one ruleset targets \`main\` and only one carries the bypass."
+              FIX="Check Settings → Rules → Rulesets: the ruleset with **Require a pull request before merging** must list the app under its Bypass list (**Apps** tab, set to **Always**). Also confirm Settings → General → Pull Requests has squash merging enabled."
               ;;
             restore)
               TITLE=":warning: **Merged, but the branch tag was not restored.**"
@@ -253,11 +252,10 @@ jobs:
             echo "| Branch tag on \`$BRANCH\` | $([ "$TAG_STATE" = ok ] && echo 'intact' || echo '**cleared — needs manual fix**') |"
             echo "| Failed at | \`$STAGE\` |"
             echo
+            echo "The \`ready-to-merge\` label has been removed. Re-apply it to retry."
+            echo
             echo "[Run log]($RUN_URL)"
           } > "$BODY_FILE"
 
-          if [ "$MERGED" = "yes" ]; then
-            gh pr edit "$PR" --remove-label ready-to-merge || true
-          fi
-
+          gh pr edit "$PR" --remove-label ready-to-merge || true
           gh pr comment "$PR" --body-file "$BODY_FILE"
