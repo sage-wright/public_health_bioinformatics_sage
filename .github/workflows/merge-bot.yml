@@ -16,7 +16,7 @@ jobs:
   merge:
     # merge a pr if it's got the right label, will merge to main, isn't a draft, is open, and isn't a fork
     if: >
-      github.event.label.name == 'ready-to-merge' &&
+      github.event.label.name == '-merge' &&
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.state == 'open' &&
@@ -281,10 +281,10 @@ jobs:
             echo "| Branch tag on \`$BRANCH\` | $([ "$TAG_STATE" = ok ] && echo 'intact' || echo '**cleared — needs manual fix**') |"
             echo "| Failed at | \`$STAGE\` |"
             echo
-            echo "The \`ready-to-merge\` label has been removed. Re-apply it to retry."
+            echo "The \`-merge\` label has been removed. Re-apply it to retry."
             echo
             echo "[Run log]($RUN_URL)"
           } > "$BODY_FILE"
 
-          gh pr edit "$PR" --remove-label ready-to-merge || true
+          gh pr edit "$PR" --remove-label -merge || true
           gh pr comment "$PR" --body-file "$BODY_FILE"
