@@ -57,8 +57,15 @@ jobs:
           echo "Approvals: $N"
 
       - name: Require checks to pass
-        run: gh pr checks "$PR"
-        
+        run: |
+          PENDING=$(gh pr checks "$PR" --json name,state \
+            --jq '[.[] | select(.name != "merge" and .state != "SUCCESS" and .state != "SKIPPED")] | length')
+          if [ "$PENDING" -ne 0 ]; then
+            gh pr checks "$PR"
+            echo "::error::Non-passing checks remain."
+            exit 1
+          fi
+
       - name: Require mergeable state
         run: |
           STATE=$(gh pr view "$PR" --json mergeStateStatus --jq .mergeStateStatus)
