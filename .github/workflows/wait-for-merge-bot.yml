@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    name: use merge bot
+    name: waiting for label
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
