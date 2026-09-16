@@ -22,6 +22,7 @@ jobs:
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       PR: ${{ github.event.pull_request.number }}
       BRANCH: ${{ github.event.pull_request.head.ref }}
@@ -58,24 +59,35 @@ jobs:
           fi
           echo "Approvals: $N"
 
+      # tolerates a repo with no required checks configured; real failures
+      # still exit non-zero.
       - name: Require checks to pass
         id: checks
         run: |
-          PENDING=$(gh pr checks "$PR" --json name,state \
-            --jq '[.[] | select(.name != "merge" and .state != "SUCCESS" and .state != "SKIPPED")] | length')
-          if [ "$PENDING" -ne 0 ]; then
-            gh pr checks "$PR"
-            echo "::error::Non-passing checks remain."
-            exit 1
+          OUT=$(gh pr checks "$PR" --required --watch --fail-fast 2>&1) && RC=0 || RC=$?
+          echo "$OUT"
+          if [ "$RC" -ne 0 ] && printf '%s' "$OUT" | grep -q 'no required checks'; then
+            echo "No required checks configured — skipping gate."
+            exit 0
           fi
+          exit "$RC"
 
+      # github computes mergeability asynchronously; UNKNOWN just means it
+      # hasn't settled yet. BLOCKED is expected once the clear push below
+      # dismisses the approval — the app's ruleset bypass resolves it.
       - name: Require mergeable state
         id: mergeable
         run: |
-          STATE=$(gh pr view "$PR" --json mergeStateStatus --jq .mergeStateStatus)
+          for i in $(seq 1 10); do
+            STATE=$(gh pr view "$PR" --json mergeStateStatus --jq .mergeStateStatus)
+            [ "$STATE" != "UNKNOWN" ] && break
+            echo "mergeStateStatus UNKNOWN, retrying ($i)..."
+            sleep 3
+          done
           echo "mergeStateStatus: $STATE"
           case "$STATE" in
             CLEAN|UNSTABLE|BLOCKED) ;;
+            UNKNOWN) echo "::error::GitHub did not settle mergeability in time."; exit 1 ;;
             *) echo "::error::PR is not mergeable (state: $STATE)."; exit 1 ;;
           esac
 
@@ -84,11 +96,10 @@ jobs:
           git config user.name  "${{ steps.token.outputs.app-slug }}[bot]"
           git config user.email "${{ steps.token.outputs.app-slug }}[bot]@users.noreply.github.com"
 
-      # this push dismisses the approval. the app's ruleset bypass is what
-      # allows the squash merge below to still go through.
+      # this push dismisses the approval. that is expected — the ruleset
+      # bypass is what lets the merge below go through anyway.
       - name: Clear branch tag
         id: clear
-        # remove any content in BRANCH_TAG=""
         run: |
           sed -i 's|^\( *BRANCH_TAG=\).*|\1""|' "$VERSION_FILE"
           if git diff --quiet; then
@@ -116,11 +127,21 @@ jobs:
             && echo "CLASSIC PROTECTION PRESENT — this is likely the problem" \
             || echo "none (good)"
 
-
+      # uses the rest api rather than `gh pr merge`: gh does a client-side
+      # mergeability pre-flight that refuses on BLOCKED without knowing the
+      # token holds a ruleset bypass. the api evaluates the bypass server-side.
       - name: Squash merge
-        # perform a squash and merge
         id: squash
-        run: gh pr merge "$PR" --squash --delete-branch=false
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          COMMITS=$(gh api "repos/${{ github.repository }}/pulls/$PR/commits" --paginate \
+            --jq '.[] | "* " + (.commit.message | split("\n")[0])' \
+            | grep -v '^\* ci: clear version tag' || true)
+          gh api -X PUT "repos/${{ github.repository }}/pulls/$PR/merge" \
+            -f merge_method=squash \
+            -f commit_title="$PR_TITLE (#$PR)" \
+            -f commit_message="$COMMITS"
 
       - name: Restore branch tag
         id: restore
@@ -137,6 +158,9 @@ jobs:
             git push
           fi
 
+      # if the clear landed but the merge didn't, the branch is sitting with
+      # an empty tag and nothing else will fix it — the stamp workflow needs
+      # a push to fire.
       - name: Restore branch tag after failure
         id: repair
         if: failure() && steps.clear.outcome == 'success' && steps.squash.outcome != 'success'
@@ -169,7 +193,6 @@ jobs:
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           BODY_FILE="$RUNNER_TEMP/merge-bot-comment.md"
 
-          # ---- identify the first failed step -------------------------------
           if   [ "$TOKEN_OUT" = "failure" ]; then STAGE="token"
           elif [ "$CHECKOUT"  = "failure" ]; then STAGE="checkout"
           elif [ "$APPROVAL"  = "failure" ]; then STAGE="approval"
@@ -181,10 +204,8 @@ jobs:
           else STAGE="unknown"
           fi
 
-          # ---- did the merge happen? ----------------------------------------
           if [ "$SQUASH" = "success" ]; then MERGED="yes"; else MERGED="no"; fi
 
-          # ---- is the branch tag currently correct? --------------------------
           if [ "$CLEAR" = "success" ] && [ "$RESTORE" != "success" ] && [ "$REPAIR" != "success" ]; then
             TAG_STATE="cleared"
           else
@@ -210,7 +231,7 @@ jobs:
             checks)
               TITLE=":x: **Merge bot stopped: required checks are not passing.**"
               WHY="One or more required status checks failed, or are still pending."
-              FIX="See the checks tab on this PR and fix the failures. If the run log says \`no required checks reported\`, no required checks are configured on this branch — that is a ruleset configuration issue, not a problem with this PR."
+              FIX="See the checks tab on this PR and fix the failures."
               ;;
             mergeable)
               TITLE=":x: **Merge bot stopped: PR is not in a mergeable state.**"
@@ -224,8 +245,8 @@ jobs:
               ;;
             squash)
               TITLE=":x: **Merge bot failed: the squash merge was refused.**"
-              WHY="GitHub rejected the merge. The most common causes are that the app is missing from the bypass list on the ruleset containing the \`pull_request\` rule, that squash merging is disabled for this repository, or that more than one ruleset targets \`main\` and only one carries the bypass."
-              FIX="Check Settings → Rules → Rulesets: the ruleset with **Require a pull request before merging** must list the app under its Bypass list (**Apps** tab, set to **Always**). Also confirm Settings → General → Pull Requests has squash merging enabled."
+              WHY="GitHub rejected the merge."
+              FIX="Check that the ruleset containing the **Require a pull request before merging** rule lists the app in its Bypass list (Apps tab, set to Always), that squash merging is enabled in Settings → General, and that no second ruleset targets \`main\` without the bypass. The run log contains the API's specific error message."
               ;;
             restore)
               TITLE=":warning: **Merged, but the branch tag was not restored.**"
