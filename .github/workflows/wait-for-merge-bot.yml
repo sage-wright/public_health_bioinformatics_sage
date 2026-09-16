@@ -1,4 +1,4 @@
-name: you must use merge bot
+name: please use merge bot
 
 on:
   pull_request:
