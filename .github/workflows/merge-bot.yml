@@ -117,6 +117,7 @@ jobs:
             *) echo "::error::PR is not mergeable (state: $STATE)."; exit 1 ;;
           esac
 
+      # remove upon successful run
       - name: Debug merge block
         continue-on-error: true
         run: |
@@ -275,7 +276,7 @@ jobs:
             echo
             echo "**What to do:** $FIX"
             echo
-            echo "| | |"
+            echo "| Current state | |"
             echo "|---|---|"
             echo "| Merged to \`main\` | $([ "$MERGED" = yes ] && echo 'yes' || echo 'no') |"
             echo "| Branch tag on \`$BRANCH\` | $([ "$TAG_STATE" = ok ] && echo 'intact' || echo '**cleared — needs manual fix**') |"
