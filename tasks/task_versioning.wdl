@@ -9,6 +9,7 @@ task version_capture {
     volatile: true
   }
   command <<<
+  	# VERSION_TAG is managed manually only on version updates
     VERSION_TAG="v4.3.0"
     # BRANCH_TAG is managed by CI; do NOT edit manually
     BRANCH_TAG=""
