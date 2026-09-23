@@ -32,8 +32,7 @@ jobs:
       BRANCH: ${{ github.event.pull_request.head.ref }}
       VERSION_FILE: tasks/task_versioning.wdl
       LABEL: "-merge"
-      # must match the team in .github/CODEOWNERS (team slug, not display name)
-      CODEOWNER_TEAM: theiagen/theiagen-codeowners
+      CODEOWNERS_FILE: .github/CODEOWNERS
 
     steps:
       - name: Mint token
@@ -55,14 +54,20 @@ jobs:
 
       # gate 1: code-owner authorization. runs before anything is written, so
       # a rejected pr leaves the branch tag intact.
-      # team membership lookup needs the app's org permission "Members: read".
+      # reads CODEOWNERS from the base branch, not the checkout, so a pr can't
+      # add its own author. like github, the last "*" line wins.
       - name: Require label applied by a code owner
         id: labeler
         env:
           SENDER: ${{ github.event.sender.login }}
+          BASE: ${{ github.event.pull_request.base.ref }}
         run: |
-          gh api "orgs/${CODEOWNER_TEAM%/*}/teams/${CODEOWNER_TEAM#*/}/memberships/$SENDER" --jq .state \
-            | grep -qx active || { echo "::error::$SENDER is not in $CODEOWNER_TEAM"; exit 1; }
+          OWNERS=$(gh api "repos/${{ github.repository }}/contents/$CODEOWNERS_FILE?ref=$BASE" \
+                     -H "Accept: application/vnd.github.raw" \
+                   | sed 's/#.*//' \
+                   | awk '$1 == "*" { o = ""; for (i = 2; i <= NF; i++) o = o $i "\n" } END { printf "%s", o }')
+          printf '%s' "$OWNERS" | grep -qixF "@$SENDER" \
+            || { echo "::error::$SENDER is not a default owner in $CODEOWNERS_FILE on $BASE"; exit 1; }
           echo "Label applied by code owner: $SENDER"
 
       # reviewDecision is github's own verdict against CODEOWNERS for the files
@@ -234,8 +239,8 @@ jobs:
               ;;
             labeler)
               TITLE=":x: **Merge bot stopped: label not applied by a code owner.**"
-              WHY="@$SENDER applied \`$LABEL\` but is not a member of \`@$CODEOWNER_TEAM\`."
-              FIX="Ask a code owner to apply the label. If they are one, check that the app has the organization **Members: read** permission — without it every membership lookup fails."
+              WHY="@$SENDER applied \`$LABEL\` but is not listed on the \`*\` line of \`$CODEOWNERS_FILE\` on \`main\`."
+              FIX="Ask a code owner to apply the label, or add @$SENDER to \`$CODEOWNERS_FILE\` on \`main\` first — edits to it on this PR's branch don't count."
               ;;
             approval)
               TITLE=":x: **Merge bot stopped: no Code Owner approval.**"
