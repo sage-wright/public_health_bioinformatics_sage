@@ -12,6 +12,12 @@ task ksnp3 {
     Int memory = 4
     Int cpu = 2
     Int disk_size = 100
+
+
+
+
+
+
   }
   command <<<
   assembly_array=(~{sep=' ' assembly_fasta})
